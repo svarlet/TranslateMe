@@ -7,6 +7,8 @@ import Http
 import CsvParser exposing (parseCsv)
 import Random exposing (generate, int)
 import List.Extra exposing (getAt)
+import Keyboard exposing (presses)
+import Platform.Sub exposing (..)
 
 -- MODEL
 
@@ -46,10 +48,11 @@ type Msg
     = UpdateInput String
     | Downloaded (Result Http.Error String)
     | RandomIndexPicked Int
+    | Submit Keyboard.KeyCode
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.none
+    Keyboard.presses (\keycode -> Submit keycode)
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -58,6 +61,7 @@ update msg model =
             ( { model | input = newInput }
             , Cmd.none
             )
+
         Downloaded (Ok csv) ->
             ( { model
                   | words = CsvParser.parseCsv csv
@@ -65,10 +69,12 @@ update msg model =
               }
             , Random.generate RandomIndexPicked (Random.int 0 ((List.length model.words) - 1))
             )
+
         Downloaded (Err _) ->
             ( { model | bootstrapStatus = Failure }
             , Cmd.none
             )
+
         RandomIndexPicked index ->
             case List.Extra.getAt index model.words of
                 Just aTranslation ->
@@ -80,6 +86,11 @@ update msg model =
                     )
                 Nothing ->
                     ( model, Cmd.none )
+
+        Submit ->
+            ( model
+            , Random.generate RandomIndexPicked (Random.int 0 ((List.length model.words) - 1))
+            )
 
 -- VIEW
 
