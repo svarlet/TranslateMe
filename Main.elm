@@ -5,15 +5,30 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onInput)
 import Http
 import CsvParser exposing (parseCsv)
+import Random exposing (generate, int)
+import List.Extra exposing (getAt)
 
 -- MODEL
 
+type BootstrapStatus
+    = Loading
+    | Success
+    | Failure
+    | Ready
+
+type alias Translation = List String
+
 type alias Model =
-    { score : Int, words : List (List String), word : String, input : String }
+    { bootstrapStatus : BootstrapStatus
+    , score : Int
+    , words : List (List String)
+    , translation : Translation
+    , input : String
+    }
 
 init : ( Model, Cmd Msg)
 init =
-    (Model 0 [] "" "", downloadWords)
+    (Model Loading 0 [] [] "", downloadWords)
 
 fileUrl : String
 fileUrl =
@@ -30,6 +45,7 @@ downloadWords =
 type Msg
     = UpdateInput String
     | Downloaded (Result Http.Error String)
+    | RandomIndexPicked Int
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
@@ -39,24 +55,59 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         UpdateInput newInput ->
-            ( { model | input = newInput }, Cmd.none )
+            ( { model | input = newInput }
+            , Cmd.none
+            )
         Downloaded (Ok csv) ->
-            ( { model | words = CsvParser.parseCsv csv }, Cmd.none )
+            ( { model
+                  | words = CsvParser.parseCsv csv
+                  , bootstrapStatus = Success
+              }
+            , Random.generate RandomIndexPicked (Random.int 0 ((List.length model.words) - 1))
+            )
         Downloaded (Err _) ->
-            ( model, Cmd.none )
+            ( { model | bootstrapStatus = Failure }
+            , Cmd.none
+            )
+        RandomIndexPicked index ->
+            case List.Extra.getAt index model.words of
+                Just aTranslation ->
+                    ( { model
+                          | translation = aTranslation
+                          , bootstrapStatus = Ready
+                      }
+                    , Cmd.none
+                    )
+                Nothing ->
+                    ( model, Cmd.none )
 
 -- VIEW
 
 view : Model -> Html Msg
 view model =
-    let
-        question = "Translate " ++ model.word
-    in
-        div
-          []
-          [ text question
-          , input [ placeholder "Ma réponse", onInput UpdateInput] []
-          ]
+    case model.bootstrapStatus of
+        Loading ->
+            text "Wait while the list of words are being loaded."
+
+        Ready ->
+            let
+                question =
+                    model.translation
+                        |> List.head
+                        |> Maybe.map ((++) "Translate ")
+                        |> Maybe.withDefault "An error happened :("
+            in
+                div
+                []
+                [ text question
+                , input [ placeholder "Ma réponse", onInput UpdateInput] []
+                ]
+
+        Success ->
+            text "Words loaded successfully :)"
+
+        Failure ->
+            text "Loading the list of words failed."
 
 -- MAIN
 
