@@ -4,15 +4,16 @@ import Html exposing (Html, Attribute, div, input, text)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onInput)
 import Http
+import CsvParser exposing (parseCsv)
 
 -- MODEL
 
 type alias Model =
-    { score : Int, wordSet : List, word : String, input : String }
+    { score : Int, words : List (List String), word : String, input : String }
 
 init : ( Model, Cmd Msg)
 init =
-    (Model 1 "" "", downloadWords)
+    (Model 0 [] "" "", downloadWords)
 
 fileUrl : String
 fileUrl =
@@ -23,13 +24,6 @@ downloadWords =
     fileUrl
         |> Http.getString
         |> Http.send Downloaded
-
-parse : String -> List (String, List String)
-parse csv =
-    csv
-        |> String.lines
-        |> List.map (Regex.split (AtMost 1) (regex ","))
-        |> List.map (\ word :: translation :: xs -> (word, String.split "," translation))
 
 -- UPDATE
 
@@ -47,7 +41,7 @@ update msg model =
         UpdateInput newInput ->
             ( { model | input = newInput }, Cmd.none )
         Downloaded (Ok csv) ->
-            ( { model | wordSet = parse csv }, Cmd.none )
+            ( { model | words = CsvParser.parseCsv csv }, Cmd.none )
         Downloaded (Err _) ->
             ( model, Cmd.none )
 
