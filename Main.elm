@@ -6,24 +6,11 @@ import Platform.Sub exposing (..)
 
 -- MODEL
 
-type alias Translation = List String
-
-type alias Model =
-    { score : Int
-    , words : List (List String)
-    , translation : Translation
-    , input : String
-    }
-
 init : ( Model, Cmd Msg )
 init =
-    ( Model 0 [] [] "", Cmd.none )
+    ( , Cmd.none )
 
 -- UPDATE
-
-type Msg
-    = UpdateInput String
-    | RandomIndexPicked Int
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
@@ -31,16 +18,6 @@ subscriptions model =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
-        UpdateInput newInput ->
-            ( { model | input = newInput }, Cmd.none )
-
-        RandomIndexPicked index ->
-            case List.Extra.getAt index model.words of
-                Just aTranslation ->
-                    ( { model | translation = aTranslation }, Cmd.none )
-                Nothing ->
-                    ( model, Cmd.none )
 
 -- VIEW
 
@@ -51,7 +28,6 @@ view model =
         [text "Placeholder from the Main module"]
 
 -- MAIN
-
 
 main : Program Never Model Msg
 main =
