@@ -1,4 +1,4 @@
-module Game exposing (..)
+module Game exposing (Model, Msg, initialModel, update, view)
 
 import List.Extra exposing (getAt)
 import Html exposing (Html, div, text)

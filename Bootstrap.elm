@@ -1,4 +1,4 @@
-module Bootstrap exposing (Model, update, view)
+module Bootstrap exposing (Msg, Model, initialModel, update, view)
 
 import Html exposing (Html, div, text)
 import Http
