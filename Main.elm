@@ -10,15 +10,16 @@ import Bootstrap
 type alias Model =
     { gameModel : Game.Model
     , bootstrapModel : Bootstrap.Model
+    , view : View
     }
 
 initialModel : Model
 initialModel =
-    Model Game.initialModel Bootstrap.initialModel
+    Model Game.initialModel Bootstrap.initialModel Bootstrap
 
 init : ( Model, Cmd Msg )
 init =
-    ( initialModel, Cmd.none )
+    ( initialModel, Cmd.map BootstrapMsg Bootstrap.downloadWords )
 
 -- UPDATE
 
@@ -39,16 +40,33 @@ update msg model =
             let
                 (updatedModel, cmd) =
                     Bootstrap.update bootstrapMsg model.bootstrapModel
+                view =
+                    case updatedModel.status of
+                        Bootstrap.Loaded ->
+                            Game
+                        _ ->
+                            Bootstrap
             in
-                ( { model | bootstrapModel = updatedModel }, Cmd.map BootstrapMsg cmd )
+                ( { model
+                      | bootstrapModel = updatedModel
+                      , view = view
+                  }
+                , Cmd.map BootstrapMsg cmd
+                )
 
 -- VIEW
 
+type View
+    = Bootstrap
+    | Game
+
 view : Model -> Html Msg
 view model =
-    div
-        []
-        [text "Placeholder from the Main module"]
+    case model.view of
+        Bootstrap ->
+            Html.map BootstrapMsg (Bootstrap.view model.bootstrapModel)
+        Game ->
+            Html.map GameMsg (Game.view model.gameModel)
 
 -- MAIN
 
