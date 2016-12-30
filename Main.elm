@@ -1,6 +1,7 @@
 module Main exposing (..)
 
 import Html exposing (Html, Attribute, div, input, text, button)
+import Html.Attributes exposing (value)
 import Html.Events exposing (onInput, onClick)
 import Http
 import List.Nonempty exposing (Nonempty(..))
@@ -9,17 +10,9 @@ import Random
 import Random.List
 import Regex exposing (..)
 import Result
+import RemoteData exposing (RemoteData(..), WebData)
 
 -- MODEL
-
-type RemoteData e a
-    = NotRequested
-    | Loading
-    | Success a
-    | Failure e
-
-type alias WebData a =
-    RemoteData Http.Error a
 
 type alias Translation =
     { englishWord : String
@@ -29,20 +22,23 @@ type alias Translation =
 type alias Translations
     = List Translation
 
-type View = Bootstrap | Game
+type View = Bootstrap | Game | GameOver
+
+type alias Score =
+    (Int, Int)
 
 type alias Model =
     { translations : WebData Translations
     , currentTranslation : Maybe Translation
     , currentView : View
     , userInput : String
-    , score : Int
+    , score : Score
     , flash : String
     }
 
 initialModel : Model
 initialModel =
-    Model NotRequested Nothing Bootstrap "" 0 ""
+    Model NotAsked Nothing Bootstrap "" (0, 0) ""
 
 init : ( Model, Cmd Msg )
 init =
@@ -100,6 +96,14 @@ validateSubmission userInput maybeTranslation =
             |> Result.map (.frenchTranslation >> findSubmissionIn)
             |> Result.map (\b -> if b == True then 1 else 0)
 
+incrementScore : Score -> Score
+incrementScore (x, y) =
+    (x + 1, y + 1)
+
+decrementScore : Score -> Score
+decrementScore (x, y) =
+    (x, y + 1)
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -121,6 +125,7 @@ update msg model =
             ( { model
                   | translations = Success remainingTranslations
                   , currentTranslation = maybeTranslation
+                  , flash = ""
               }
             , Cmd.none
             )
@@ -135,16 +140,37 @@ update msg model =
                     , Cmd.none
                     )
                 Ok 0 ->
-                    ( { model | flash = "Wrong answer :("}
+                    ( { model
+                          | score = decrementScore model.score
+                          , flash = "Wrong answer :("}
                     , Cmd.none
                     )
                 Ok bonus ->
-                    ( { model
-                          | score = model.score + bonus
-                          , flash = "Well done!!!"
-                      }
-                    , Cmd.none
-                    )
+                    let
+                        isGameOver =
+                            case model.translations of
+                                Success [] ->
+                                    True
+                                Success _ ->
+                                    False
+                                _ ->
+                                    True
+                        updatedModel =
+                            if isGameOver then
+                                { model
+                                    | score = incrementScore model.score
+                                    , currentView = GameOver
+                                }
+                            else
+                                { model
+                                    | score = incrementScore model.score
+                                    , userInput = ""
+                                }
+                        nextCommand =
+                            RemoteData.map pickRandomTranslation model.translations
+                                |> RemoteData.withDefault Cmd.none
+                    in
+                        ( updatedModel, nextCommand )
 
 -- VIEW
 
@@ -152,13 +178,13 @@ viewBootstrap : Html Msg
 viewBootstrap =
     text "Bootstrapping..."
 
-viewTranslationExercise : Maybe Translation -> Html Msg
-viewTranslationExercise translation =
-    case translation of
+viewTranslationExercise : Model -> Html Msg
+viewTranslationExercise model =
+    case model.currentTranslation of
         Just aTranslation ->
             div []
                 [ text <| "Please translate \"" ++ aTranslation.englishWord ++ "\""
-                , input [ onInput UserInput ] [ text "Your answer here" ]
+                , input [ onInput UserInput, value model.userInput ] [ ]
                 , button [ onClick Submit ] [ text "Submit"]
                 ]
         Nothing ->
@@ -175,8 +201,12 @@ viewFlash model =
 
 viewScore : Model -> Html Msg
 viewScore model =
-    div []
-        [ text <| (++) "Your score: " <| toString model.score ]
+    let
+        scoreToString (x, y) =
+            (toString x) ++ "/" ++ (toString y)
+    in
+        div []
+            [ text ("Your score: " ++ scoreToString model.score) ]
 
 view : Model -> Html Msg
 view model =
@@ -186,8 +216,13 @@ view model =
         Game ->
             div []
                 [ viewFlash model
-                , viewTranslationExercise model.currentTranslation
+                , viewTranslationExercise model
                 , viewScore model
+                ]
+        GameOver ->
+            div []
+                [ text "Game Over!"
+                , text <| "Your score is" ++ (toString model.score)
                 ]
 
 -- MAIN
