@@ -1,14 +1,14 @@
 module Main exposing (..)
 
-import Html exposing (Html, Attribute, div, input, text)
-import Html.Events exposing (onInput)
+import Html exposing (Html, Attribute, div, input, text, button)
+import Html.Events exposing (onInput, onClick)
 import Http
 import List.Nonempty exposing (Nonempty(..))
-import Maybe
 import Platform.Sub exposing (..)
 import Random
 import Random.List
 import Regex exposing (..)
+import Result
 
 -- MODEL
 
@@ -29,19 +29,20 @@ type alias Translation =
 type alias Translations
     = List Translation
 
-type SelectedTranslation
-    = NoSelectionYet
-    | Selection (Maybe Translation)
+type View = Bootstrap | Game
 
 type alias Model =
     { translations : WebData Translations
-    , currentTranslation : SelectedTranslation
-    , userInput : Maybe String
+    , currentTranslation : Maybe Translation
+    , currentView : View
+    , userInput : String
+    , score : Int
+    , flash : String
     }
 
 initialModel : Model
 initialModel =
-    Model NotRequested NoSelectionYet Nothing
+    Model NotRequested Nothing Bootstrap "" 0 ""
 
 init : ( Model, Cmd Msg )
 init =
@@ -55,6 +56,7 @@ type Msg
     = LoadingComplete (Result Http.Error String)
     | RandomTranslationPicked (Maybe Translation, Translations)
     | UserInput String
+    | Submit
 
 loadTranslations : Cmd Msg
 loadTranslations =
@@ -77,6 +79,7 @@ parseCsv csv =
                     Nothing
     in
         csv
+            |> String.toLower
             |> String.lines
             |> List.filterMap (trimTrailingComma >> splitOnComma >> makeTranslation)
 
@@ -87,6 +90,16 @@ pickRandomTranslation translations =
     in
         Random.generate (RandomTranslationPicked) translationRandomGenerator
 
+validateSubmission : String -> Maybe Translation -> Result String Int
+validateSubmission userInput maybeTranslation =
+    let
+        containsUserInput = String.contains userInput
+        findSubmissionIn = List.Nonempty.any containsUserInput
+    in
+        Result.fromMaybe ("You played all existing translations! Game Over :P !") maybeTranslation
+            |> Result.map (.frenchTranslation >> findSubmissionIn)
+            |> Result.map (\b -> if b == True then 1 else 0)
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -94,7 +107,10 @@ update msg model =
             let
                 translations = parseCsv csvContent
             in
-                ( { model | translations = Success translations }
+                ( { model
+                      | translations = Success translations
+                      , currentView = Game
+                  }
                 , pickRandomTranslation translations
                 )
         LoadingComplete (Err error) ->
@@ -104,14 +120,31 @@ update msg model =
         RandomTranslationPicked (maybeTranslation, remainingTranslations) ->
             ( { model
                   | translations = Success remainingTranslations
-                  , currentTranslation = Selection maybeTranslation
+                  , currentTranslation = maybeTranslation
               }
             , Cmd.none
             )
         UserInput input ->
-                ( { model | userInput = Just input }
+                ( { model | userInput = input }
                 , Cmd.none
                 )
+        Submit ->
+            case validateSubmission model.userInput model.currentTranslation of
+                Err message ->
+                    ( { model | flash = message }
+                    , Cmd.none
+                    )
+                Ok 0 ->
+                    ( { model | flash = "Wrong answer :("}
+                    , Cmd.none
+                    )
+                Ok bonus ->
+                    ( { model
+                          | score = model.score + bonus
+                          , flash = "Well done!!!"
+                      }
+                    , Cmd.none
+                    )
 
 -- VIEW
 
@@ -126,18 +159,36 @@ viewTranslationExercise translation =
             div []
                 [ text <| "Please translate \"" ++ aTranslation.englishWord ++ "\""
                 , input [ onInput UserInput ] [ text "Your answer here" ]
-                , text (toString aTranslation)
+                , button [ onClick Submit ] [ text "Submit"]
                 ]
         Nothing ->
             text "Sorry, I could not prepare another question for you. :-("
 
+viewFlash : Model -> Html Msg
+viewFlash model =
+    case model.flash of
+        "" ->
+            div [] []
+        _ ->
+            div []
+                [ text model.flash ]
+
+viewScore : Model -> Html Msg
+viewScore model =
+    div []
+        [ text <| (++) "Your score: " <| toString model.score ]
+
 view : Model -> Html Msg
 view model =
-    case model.currentTranslation of
-        NoSelectionYet ->
+    case model.currentView of
+        Bootstrap ->
             viewBootstrap
-        Selection maybeTranslation ->
-            viewTranslationExercise maybeTranslation
+        Game ->
+            div []
+                [ viewFlash model
+                , viewTranslationExercise model.currentTranslation
+                , viewScore model
+                ]
 
 -- MAIN
 
