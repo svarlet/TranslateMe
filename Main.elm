@@ -3,7 +3,7 @@ module Main exposing (..)
 import Html exposing (Html, Attribute, div, input, text, button)
 import Html.Attributes exposing (value)
 import Html.Events exposing (onInput, onClick)
-import Http
+import Http exposing (Error(..))
 import List.Nonempty exposing (Nonempty(..))
 import Platform.Sub exposing (..)
 import Random
@@ -118,9 +118,26 @@ update msg model =
                 , pickRandomTranslation translations
                 )
         LoadingComplete (Err error) ->
-            ( { model | translations = Failure error }
-            , Cmd.none
-            )
+            let
+                flashMessage =
+                    case error of
+                        BadUrl message ->
+                            "The URL of the resource file is invalid."
+                        Timeout ->
+                            "The request for the resource file timed out."
+                        NetworkError ->
+                            "The request for the resource file could not complete due to a network error."
+                        BadStatus _ ->
+                            "The request for the resource file returned with a bad status code"
+                        BadPayload _ _ ->
+                            "The request for the resource file returned with invalid or corrupted data."
+            in
+                ( { model
+                      | translations = Failure error
+                      , flash = flashMessage
+                  }
+                , Cmd.none
+                )
         RandomTranslationPicked (maybeTranslation, remainingTranslations) ->
             ( { model
                   | translations = Success remainingTranslations
@@ -212,7 +229,10 @@ view : Model -> Html Msg
 view model =
     case model.currentView of
         Bootstrap ->
-            viewBootstrap
+            div []
+                [ viewFlash model
+                , viewBootstrap
+                ]
         Game ->
             div []
                 [ viewFlash model
