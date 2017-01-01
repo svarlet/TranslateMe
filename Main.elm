@@ -12,20 +12,12 @@ import Regex exposing (..)
 import Result
 import RemoteData exposing (RemoteData(..), WebData)
 
+import Types.Translation exposing (Translation, Translations)
+import Types.Score exposing (Score)
+
 -- MODEL
 
-type alias Translation =
-    { englishWord : String
-    , frenchTranslation : Nonempty String
-    }
-
-type alias Translations
-    = List Translation
-
 type View = Bootstrap | Game | GameOver
-
-type alias Score =
-    (Int, Int)
 
 type alias Model =
     { translations : WebData Translations
