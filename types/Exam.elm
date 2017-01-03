@@ -1,9 +1,20 @@
-module Types.Exam exposing (Exam(..), init, passCurrentQuestion, failCurrentQuestion, score)
+module Types.Exam exposing
+    ( Exam(..)
+    , Validity(..)
+    , init
+    , passCurrentQuestion
+    , failCurrentQuestion
+    , score
+    , fromTranslations
+    , mapCurrentQuestion
+    , submitAnswer)
 
-import Types.Translation exposing (Translation)
+import List.Nonempty
+
+import Types.Translation exposing (Translation, Translations)
 import Types.Score as Score exposing (Score)
 
-type Result
+type Validity
     = Pass
     | Fail
 
@@ -11,7 +22,7 @@ type Question =
     Question Translation
 
 type Answer =
-    Answer Question Result
+    Answer Question Validity
 
 type Exam =
     Exam
@@ -29,8 +40,23 @@ init q qs =
       , remaining = qs
       }
 
-next : Exam -> Result -> Exam
-next (Exam exam) result =
+fromTranslations : Translations -> Maybe Exam
+fromTranslations translations =
+    case translations of
+        [] ->
+            Nothing
+        x :: xs ->
+            Just <| init (Question x) <| List.map (Question) xs
+
+mapCurrentQuestion : (Translation -> a) -> Exam -> a
+mapCurrentQuestion f (Exam exam ) =
+    let
+        (Question translation) = exam.current
+    in
+        f translation
+
+next : Exam -> Validity -> Exam
+next (Exam exam) validity =
     let
         (q, qxs) =
             case exam.remaining of
@@ -40,7 +66,7 @@ next (Exam exam) result =
                     (question, rest)
     in
         Exam
-          { answered = exam.answered ++ [ Answer exam.current result ]
+          { answered = exam.answered ++ [ Answer exam.current validity ]
           , current = q
           , remaining = qxs
           }
@@ -52,6 +78,17 @@ passCurrentQuestion exam =
 failCurrentQuestion : Exam -> Exam
 failCurrentQuestion exam =
     next exam Fail
+
+submitAnswer : Exam -> String -> (Validity, Exam)
+submitAnswer (Exam exam) submission =
+    let
+        containsSubmission = String.contains submission
+        validateSubmissionFor (Question translation) = List.Nonempty.any containsSubmission translation.frenchTranslation
+    in
+        if validateSubmissionFor exam.current then
+            (Pass, passCurrentQuestion (Exam exam))
+        else
+            (Fail, failCurrentQuestion (Exam exam))
 
 score : Exam -> Score
 score (Exam exam) =

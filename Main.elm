@@ -13,7 +13,8 @@ import Result
 import RemoteData exposing (RemoteData(..), WebData)
 
 import Types.Translation exposing (Translation, Translations)
-import Types.Score as Score exposing (Score)
+import Types.Exam as Exam exposing (Exam(..), Validity(..))
+import Types.Score as Score
 
 -- MODEL
 
@@ -21,16 +22,15 @@ type View = Bootstrap | Game | GameOver
 
 type alias Model =
     { translations : WebData Translations
-    , currentTranslation : Maybe Translation
+    , exam : Maybe Exam
     , currentView : View
     , userInput : String
-    , score : Score
     , flash : String
     }
 
 initialModel : Model
 initialModel =
-    Model NotAsked Nothing Bootstrap "" Score.init ""
+    Model NotAsked Nothing Bootstrap "" ""
 
 init : ( Model, Cmd Msg )
 init =
@@ -42,7 +42,8 @@ init =
 
 type Msg
     = LoadingComplete (Result Http.Error String)
-    | RandomTranslationPicked (Maybe Translation, Translations)
+    -- | RandomTranslationPicked (Maybe Translation, Translations)
+    | ShuffledTranslation (Translations)
     | UserInput String
     | Submit
 
@@ -71,22 +72,12 @@ parseCsv csv =
             |> String.lines
             |> List.filterMap (trimTrailingComma >> splitOnComma >> makeTranslation)
 
-pickRandomTranslation : Translations -> Cmd Msg
-pickRandomTranslation translations =
+shuffleTranslations : Translations -> Cmd Msg
+shuffleTranslations translations =
     let
-        translationRandomGenerator = Random.List.choose translations
+        randomGenerator = Random.List.shuffle translations
     in
-        Random.generate (RandomTranslationPicked) translationRandomGenerator
-
-validateSubmission : String -> Maybe Translation -> Result String Int
-validateSubmission userInput maybeTranslation =
-    let
-        containsUserInput = String.contains userInput
-        findSubmissionIn = List.Nonempty.any containsUserInput
-    in
-        Result.fromMaybe ("You played all existing translations! Game Over :P !") maybeTranslation
-            |> Result.map (.frenchTranslation >> findSubmissionIn)
-            |> Result.map (\b -> if b == True then 1 else 0)
+        Random.generate (ShuffledTranslation) randomGenerator
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
@@ -95,11 +86,8 @@ update msg model =
             let
                 translations = parseCsv csvContent
             in
-                ( { model
-                      | translations = Success translations
-                      , currentView = Game
-                  }
-                , pickRandomTranslation translations
+                ( { model | translations = Success translations }
+                , shuffleTranslations translations
                 )
         LoadingComplete (Err error) ->
             let
@@ -122,56 +110,52 @@ update msg model =
                   }
                 , Cmd.none
                 )
-        RandomTranslationPicked (maybeTranslation, remainingTranslations) ->
-            ( { model
-                  | translations = Success remainingTranslations
-                  , currentTranslation = maybeTranslation
-                  , flash = ""
-              }
-            , Cmd.none
-            )
+        ShuffledTranslation shuffledTranslations ->
+            let
+                maybeExam = Exam.fromTranslations shuffledTranslations
+            in
+                case maybeExam of
+                    Just exam ->
+                        ( { model
+                              | currentView = Game
+                              , exam = maybeExam
+                          }
+                        , Cmd.none
+                        )
+                    Nothing ->
+                        ( { model
+                              | flash = "Error: I could not prepare an exam from the list of translations."
+                          }
+                        , Cmd.none
+                        )
         UserInput input ->
                 ( { model | userInput = input }
                 , Cmd.none
                 )
         Submit ->
-            case validateSubmission model.userInput model.currentTranslation of
-                Err message ->
-                    ( { model | flash = message }
+            case model.exam of
+                Just exam ->
+                    case Exam.submitAnswer exam model.userInput of
+                        (Pass, updatedExam) ->
+                            ( { model
+                                  | flash = "Correct!"
+                                  , userInput = ""
+                                  , exam = Just updatedExam
+                              }
+                            , Cmd.none
+                            )
+                        (Fail, updatedExam) ->
+                            ( { model
+                                  | flash = "Wrong!"
+                                  , userInput = ""
+                                  , exam = Just updatedExam
+                              }
+                            , Cmd.none
+                            )
+                Nothing ->
+                    ( { model | flash = "You can't submit an answer, you are not in an exam!" }
                     , Cmd.none
                     )
-                Ok 0 ->
-                    ( { model
-                          | score = Score.fail model.score
-                          , flash = "Wrong answer :("}
-                    , Cmd.none
-                    )
-                Ok bonus ->
-                    let
-                        isGameOver =
-                            case model.translations of
-                                Success [] ->
-                                    True
-                                Success _ ->
-                                    False
-                                _ ->
-                                    True
-                        updatedModel =
-                            if isGameOver then
-                                { model
-                                    | score = Score.succeed model.score
-                                    , currentView = GameOver
-                                }
-                            else
-                                { model
-                                    | score = Score.succeed model.score
-                                    , userInput = ""
-                                }
-                        nextCommand =
-                            RemoteData.map pickRandomTranslation model.translations
-                                |> RemoteData.withDefault Cmd.none
-                    in
-                        ( updatedModel, nextCommand )
 
 -- VIEW
 
@@ -181,13 +165,17 @@ viewBootstrap =
 
 viewTranslationExercise : Model -> Html Msg
 viewTranslationExercise model =
-    case model.currentTranslation of
-        Just aTranslation ->
-            div []
-                [ text <| "Please translate \"" ++ aTranslation.englishWord ++ "\""
-                , input [ onInput UserInput, value model.userInput ] [ ]
-                , button [ onClick Submit ] [ text "Submit"]
-                ]
+    case model.exam of
+        Just exam ->
+            let
+                toQuestion aTranslation =
+                    "Please translate " ++ "\"" ++ aTranslation.englishWord ++ "\""
+            in
+                div []
+                    [ text <| Exam.mapCurrentQuestion toQuestion exam
+                    , input [ onInput UserInput, value model.userInput ] [ ]
+                    , button [ onClick Submit ] [ text "Submit"]
+                    ]
         Nothing ->
             text "Sorry, I could not prepare another question for you. :-("
 
@@ -202,12 +190,15 @@ viewFlash model =
 
 viewScore : Model -> Html Msg
 viewScore model =
-    let
-        scoreToString (x, y) =
-            (toString x) ++ "/" ++ (toString y)
-    in
-        div []
-            [ text ("Your score: " ++ scoreToString model.score) ]
+    case model.exam of
+        Just exam ->
+            let
+                score = Exam.score exam
+            in
+                div []
+                    [ text ("Your score: " ++ (Score.toText score) ) ]
+        Nothing ->
+            text "You have no score because there is no exam in progress."
 
 view : Model -> Html Msg
 view model =
@@ -224,10 +215,17 @@ view model =
                 , viewScore model
                 ]
         GameOver ->
-            div []
-                [ text "Game Over!"
-                , text <| "Your score is" ++ (toString model.score)
-                ]
+            case model.exam of
+                Just exam ->
+                    let
+                        score = Exam.score exam
+                    in
+                        div []
+                            [ text "Game Over!"
+                            , text <| "Your score is" ++ (Score.toText score)
+                            ]
+                Nothing ->
+                    text "Errr, that's weird, there is no exam in progress so you shouldn't be in a game over state..."
 
 -- MAIN
 
@@ -244,5 +242,4 @@ main =
         , subscriptions = subscriptions
         }
 
--- TODO: handle file download failure
 -- TODO: handle empty list of translations (ie when playing all existing translations)

@@ -14,3 +14,7 @@ succeed (x, y) =
 fail : Score -> Score
 fail (x, y) =
     (x, y + 1)
+
+toText : Score -> String
+toText (x, y) =
+    (toString x) ++ "/" ++ (toString y)
