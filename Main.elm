@@ -13,7 +13,7 @@ import Result
 import RemoteData exposing (RemoteData(..), WebData)
 
 import Types.Translation exposing (Translation, Translations)
-import Types.Score exposing (Score)
+import Types.Score as Score exposing (Score)
 
 -- MODEL
 
@@ -30,7 +30,7 @@ type alias Model =
 
 initialModel : Model
 initialModel =
-    Model NotAsked Nothing Bootstrap "" (0, 0) ""
+    Model NotAsked Nothing Bootstrap "" Score.init ""
 
 init : ( Model, Cmd Msg )
 init =
@@ -88,14 +88,6 @@ validateSubmission userInput maybeTranslation =
             |> Result.map (.frenchTranslation >> findSubmissionIn)
             |> Result.map (\b -> if b == True then 1 else 0)
 
-incrementScore : Score -> Score
-incrementScore (x, y) =
-    (x + 1, y + 1)
-
-decrementScore : Score -> Score
-decrementScore (x, y) =
-    (x, y + 1)
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -150,7 +142,7 @@ update msg model =
                     )
                 Ok 0 ->
                     ( { model
-                          | score = decrementScore model.score
+                          | score = Score.fail model.score
                           , flash = "Wrong answer :("}
                     , Cmd.none
                     )
@@ -167,12 +159,12 @@ update msg model =
                         updatedModel =
                             if isGameOver then
                                 { model
-                                    | score = incrementScore model.score
+                                    | score = Score.succeed model.score
                                     , currentView = GameOver
                                 }
                             else
                                 { model
-                                    | score = incrementScore model.score
+                                    | score = Score.succeed model.score
                                     , userInput = ""
                                 }
                         nextCommand =
