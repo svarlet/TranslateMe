@@ -18,12 +18,12 @@ import Types.Score as Score
 
 -- MODEL
 
-type View = Bootstrap | Game | GameOver
+type AppStage = Bootstrap | Game | GameOver
 
 type alias Model =
     { translations : WebData Translations
     , exam : Maybe Exam
-    , currentView : View
+    , currentAppStage : AppStage
     , userInput : String
     , flash : String
     }
@@ -42,7 +42,6 @@ init =
 
 type Msg
     = LoadingComplete (Result Http.Error String)
-    -- | RandomTranslationPicked (Maybe Translation, Translations)
     | ShuffledTranslation (Translations)
     | UserInput String
     | Submit
@@ -117,7 +116,7 @@ update msg model =
                 case maybeExam of
                     Just exam ->
                         ( { model
-                              | currentView = Game
+                              | currentAppStage = Game
                               , exam = maybeExam
                           }
                         , Cmd.none
@@ -202,7 +201,7 @@ viewScore model =
 
 view : Model -> Html Msg
 view model =
-    case model.currentView of
+    case model.currentAppStage of
         Bootstrap ->
             div []
                 [ viewFlash model
