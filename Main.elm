@@ -90,24 +90,25 @@ update msg model =
         LoadingComplete (Err error) ->
             ( { model | exam = Failure error }, Cmd.none )
         ShuffledTranslation shuffledTranslations ->
-            let
-                maybeExam = Exam.fromTranslations shuffledTranslations
-            in
-                case maybeExam of
-                    Just exam ->
-                        ( { model
-                              | exam = Success exam
-                              , currentAppStage = Game
-                          }
-                        , Cmd.none
-                        )
-                    Nothing ->
-                        let
-                            failure =
-                                Http.Response translationsUrl { code = 200, message = "Ok" } Dict.empty "<CSV file content>"
-                                    |> BadPayload "Could not prepare an exam from the reference file."
-                        in
-                            ( { model | exam = Failure failure }, Cmd.none )
+            case Exam.fromTranslations shuffledTranslations of
+                Just exam ->
+                    ( { model
+                          | exam = Success exam
+                          , currentAppStage = Game
+                      }
+                    , Cmd.none
+                    )
+                Nothing ->
+                    let
+                        status = { code = 200, message = "Ok" }
+                        headers = Dict.empty
+                        body = "<CSV file content>"
+                        errorMessage = "Could not prepare an exam from the reference file."
+                        failure =
+                            Http.Response translationsUrl status headers body
+                                |> BadPayload errorMessage
+                    in
+                        ( { model | exam = Failure failure }, Cmd.none )
         UserInput input ->
                 ( { model | userInput = input }
                 , Cmd.none
@@ -116,29 +117,6 @@ update msg model =
             ( { model | exam = RemoteData.map (Exam.submitAnswer model.userInput) model.exam }
             , Cmd.none
             )
-            -- case model.exam of
-            --     Just exam ->
-            --         case Exam.submitAnswer exam model.userInput of
-            --             (Pass, updatedExam) ->
-            --                 ( { model
-            --                       | flash = "Correct!"
-            --                       , userInput = ""
-            --                       , exam = Just updatedExam
-            --                   }
-            --                 , Cmd.none
-            --                 )
-            --             (Fail, updatedExam) ->
-            --                 ( { model
-            --                       | flash = "Wrong!"
-            --                       , userInput = ""
-            --                       , exam = Just updatedExam
-            --                   }
-            --                 , Cmd.none
-            --                 )
-            --     Nothing ->
-            --         ( { model | flash = "You can't submit an answer, you are not in an exam!" }
-            --         , Cmd.none
-            --         )
 
 -- VIEW
 
@@ -161,19 +139,6 @@ viewExercise model =
             , input [ onInput UserInput, value model.userInput ] [ ]
             , button [ onClick Submit ] [ text "Submit"]
             ]
-    -- case model.exam of
-    --     Just exam ->
-    --         let
-    --             toQuestion aTranslation =
-    --                 "Please translate " ++ "\"" ++ aTranslation.englishWord ++ "\""
-    --         in
-    --             div []
-    --                 [ text <| Exam.mapCurrentQuestion toQuestion exam
-    --                 , input [ onInput UserInput, value model.userInput ] [ ]
-    --                 , button [ onClick Submit ] [ text "Submit"]
-    --                 ]
-    --     Nothing ->
-    --         text "Sorry, I could not prepare another question for you. :-("
 
 viewFlash : Model -> Html Msg
 viewFlash model =
@@ -190,15 +155,6 @@ viewScore model =
     in
         div []
             [ text <| "Your score: " ++ score ]
-    -- case model.exam of
-    --     Just exam ->
-    --         let
-    --             score = Exam.score exam
-    --         in
-    --             div []
-    --                 [ text ("Your score: " ++ (Score.toText score) ) ]
-    --     Nothing ->
-    --         text "You have no score because there is no exam in progress."
 
 view : Model -> Html Msg
 view model =
@@ -219,17 +175,6 @@ view model =
                 [ text "Game Over!"
                 , viewScore model
                 ]
-            -- case model.exam of
-            --     Just exam ->
-            --         let
-            --             score = Exam.score exam
-            --         in
-            --             div []
-            --                 [ text "Game Over!"
-            --                 , text <| "Your score is" ++ (Score.toText score)
-            --                 ]
-            --     Nothing ->
-            --         text "Errr, that's weird, there is no exam in progress so you shouldn't be in a game over state..."
 
 -- MAIN
 
@@ -245,5 +190,3 @@ main =
         , update = update
         , subscriptions = subscriptions
         }
-
--- TODO: handle empty list of translations (ie when playing all existing translations)
