@@ -128,7 +128,7 @@ viewExercise : Model -> Html Msg
 viewExercise model =
     let
         toText aTranslation =
-            "Please translate " ++ "\"" ++ aTranslation.englishWord ++ "\""
+            "Please translate \"" ++ aTranslation.englishWord ++ "\""
         question =
             model.exam
                 |> RemoteData.map (Exam.mapCurrentQuestion toText)
