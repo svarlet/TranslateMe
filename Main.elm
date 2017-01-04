@@ -114,7 +114,10 @@ update msg model =
                 , Cmd.none
                 )
         Submit ->
-            ( { model | exam = RemoteData.map (Exam.submitAnswer model.userInput) model.exam }
+            ( { model
+                  | exam = RemoteData.map (Exam.submitAnswer model.userInput) model.exam
+                  , userInput = ""
+              }
             , Cmd.none
             )
 
