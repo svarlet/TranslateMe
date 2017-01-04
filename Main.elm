@@ -11,6 +11,7 @@ import Random.List
 import Regex exposing (..)
 import Result
 import RemoteData exposing (RemoteData(..), WebData)
+import Dict
 
 import Types.Translation exposing (Translation, Translations)
 import Types.Exam as Exam exposing (Exam(..), Validity(..))
@@ -21,8 +22,7 @@ import Types.Score as Score
 type AppStage = Bootstrap | Game | GameOver
 
 type alias Model =
-    { translations : WebData Translations
-    , exam : Maybe Exam
+    { exam : WebData Exam
     , currentAppStage : AppStage
     , userInput : String
     , flash : String
@@ -30,11 +30,11 @@ type alias Model =
 
 initialModel : Model
 initialModel =
-    Model NotAsked Nothing Bootstrap "" ""
+    Model NotAsked Bootstrap "" ""
 
 init : ( Model, Cmd Msg )
 init =
-    ( { initialModel | translations = Loading }
+    ( { initialModel | exam = Loading }
     , loadTranslations
     )
 
@@ -46,9 +46,13 @@ type Msg
     | UserInput String
     | Submit
 
+translationsUrl : String
+translationsUrl =
+    "https://dl.dropboxusercontent.com/u/4800046/word-list.csv"
+
 loadTranslations : Cmd Msg
 loadTranslations =
-    "https://dl.dropboxusercontent.com/u/4800046/word-list.csv"
+    translationsUrl
         |> Http.getString
         |> Http.send LoadingComplete
 
@@ -82,33 +86,9 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         LoadingComplete (Ok csvContent) ->
-            let
-                translations = parseCsv csvContent
-            in
-                ( { model | translations = Success translations }
-                , shuffleTranslations translations
-                )
+            ( model, shuffleTranslations <| parseCsv csvContent )
         LoadingComplete (Err error) ->
-            let
-                flashMessage =
-                    case error of
-                        BadUrl message ->
-                            "The URL of the resource file is invalid."
-                        Timeout ->
-                            "The request for the resource file timed out."
-                        NetworkError ->
-                            "The request for the resource file could not complete due to a network error."
-                        BadStatus _ ->
-                            "The request for the resource file returned with a bad status code"
-                        BadPayload _ _ ->
-                            "The request for the resource file returned with invalid or corrupted data."
-            in
-                ( { model
-                      | translations = Failure error
-                      , flash = flashMessage
-                  }
-                , Cmd.none
-                )
+            ( { model | exam = Failure error }, Cmd.none )
         ShuffledTranslation shuffledTranslations ->
             let
                 maybeExam = Exam.fromTranslations shuffledTranslations
@@ -116,45 +96,49 @@ update msg model =
                 case maybeExam of
                     Just exam ->
                         ( { model
-                              | currentAppStage = Game
-                              , exam = maybeExam
+                              | exam = Success exam
+                              , currentAppStage = Game
                           }
                         , Cmd.none
                         )
                     Nothing ->
-                        ( { model
-                              | flash = "Error: I could not prepare an exam from the list of translations."
-                          }
-                        , Cmd.none
-                        )
+                        let
+                            failure =
+                                Http.Response translationsUrl { code = 200, message = "Ok" } Dict.empty "<CSV file content>"
+                                    |> BadPayload "Could not prepare an exam from the reference file."
+                        in
+                            ( { model | exam = Failure failure }, Cmd.none )
         UserInput input ->
                 ( { model | userInput = input }
                 , Cmd.none
                 )
         Submit ->
-            case model.exam of
-                Just exam ->
-                    case Exam.submitAnswer exam model.userInput of
-                        (Pass, updatedExam) ->
-                            ( { model
-                                  | flash = "Correct!"
-                                  , userInput = ""
-                                  , exam = Just updatedExam
-                              }
-                            , Cmd.none
-                            )
-                        (Fail, updatedExam) ->
-                            ( { model
-                                  | flash = "Wrong!"
-                                  , userInput = ""
-                                  , exam = Just updatedExam
-                              }
-                            , Cmd.none
-                            )
-                Nothing ->
-                    ( { model | flash = "You can't submit an answer, you are not in an exam!" }
-                    , Cmd.none
-                    )
+            ( { model | exam = RemoteData.map (Exam.submitAnswer model.userInput) model.exam }
+            , Cmd.none
+            )
+            -- case model.exam of
+            --     Just exam ->
+            --         case Exam.submitAnswer exam model.userInput of
+            --             (Pass, updatedExam) ->
+            --                 ( { model
+            --                       | flash = "Correct!"
+            --                       , userInput = ""
+            --                       , exam = Just updatedExam
+            --                   }
+            --                 , Cmd.none
+            --                 )
+            --             (Fail, updatedExam) ->
+            --                 ( { model
+            --                       | flash = "Wrong!"
+            --                       , userInput = ""
+            --                       , exam = Just updatedExam
+            --                   }
+            --                 , Cmd.none
+            --                 )
+            --     Nothing ->
+            --         ( { model | flash = "You can't submit an answer, you are not in an exam!" }
+            --         , Cmd.none
+            --         )
 
 -- VIEW
 
@@ -162,42 +146,59 @@ viewBootstrap : Html Msg
 viewBootstrap =
     text "Bootstrapping..."
 
-viewTranslationExercise : Model -> Html Msg
-viewTranslationExercise model =
-    case model.exam of
-        Just exam ->
-            let
-                toQuestion aTranslation =
-                    "Please translate " ++ "\"" ++ aTranslation.englishWord ++ "\""
-            in
-                div []
-                    [ text <| Exam.mapCurrentQuestion toQuestion exam
-                    , input [ onInput UserInput, value model.userInput ] [ ]
-                    , button [ onClick Submit ] [ text "Submit"]
-                    ]
-        Nothing ->
-            text "Sorry, I could not prepare another question for you. :-("
+viewExercise : Model -> Html Msg
+viewExercise model =
+    let
+        toText aTranslation =
+            "Please translate " ++ "\"" ++ aTranslation.englishWord ++ "\""
+        question =
+            model.exam
+                |> RemoteData.map (Exam.mapCurrentQuestion toText)
+                |> RemoteData.withDefault "I could not prepare a new exercise."
+    in
+        div []
+            [ text question
+            , input [ onInput UserInput, value model.userInput ] [ ]
+            , button [ onClick Submit ] [ text "Submit"]
+            ]
+    -- case model.exam of
+    --     Just exam ->
+    --         let
+    --             toQuestion aTranslation =
+    --                 "Please translate " ++ "\"" ++ aTranslation.englishWord ++ "\""
+    --         in
+    --             div []
+    --                 [ text <| Exam.mapCurrentQuestion toQuestion exam
+    --                 , input [ onInput UserInput, value model.userInput ] [ ]
+    --                 , button [ onClick Submit ] [ text "Submit"]
+    --                 ]
+    --     Nothing ->
+    --         text "Sorry, I could not prepare another question for you. :-("
 
 viewFlash : Model -> Html Msg
 viewFlash model =
-    case model.flash of
-        "" ->
-            div [] []
-        _ ->
-            div []
-                [ text model.flash ]
+    div []
+        [ text model.flash ]
 
 viewScore : Model -> Html Msg
 viewScore model =
-    case model.exam of
-        Just exam ->
-            let
-                score = Exam.score exam
-            in
-                div []
-                    [ text ("Your score: " ++ (Score.toText score) ) ]
-        Nothing ->
-            text "You have no score because there is no exam in progress."
+    let
+        score =
+            model.exam
+                |> RemoteData.map (Exam.score >> Score.toText)
+                |> RemoteData.withDefault "0/0"
+    in
+        div []
+            [ text <| "Your score: " ++ score ]
+    -- case model.exam of
+    --     Just exam ->
+    --         let
+    --             score = Exam.score exam
+    --         in
+    --             div []
+    --                 [ text ("Your score: " ++ (Score.toText score) ) ]
+    --     Nothing ->
+    --         text "You have no score because there is no exam in progress."
 
 view : Model -> Html Msg
 view model =
@@ -210,21 +211,25 @@ view model =
         Game ->
             div []
                 [ viewFlash model
-                , viewTranslationExercise model
+                , viewExercise model
                 , viewScore model
                 ]
         GameOver ->
-            case model.exam of
-                Just exam ->
-                    let
-                        score = Exam.score exam
-                    in
-                        div []
-                            [ text "Game Over!"
-                            , text <| "Your score is" ++ (Score.toText score)
-                            ]
-                Nothing ->
-                    text "Errr, that's weird, there is no exam in progress so you shouldn't be in a game over state..."
+            div []
+                [ text "Game Over!"
+                , viewScore model
+                ]
+            -- case model.exam of
+            --     Just exam ->
+            --         let
+            --             score = Exam.score exam
+            --         in
+            --             div []
+            --                 [ text "Game Over!"
+            --                 , text <| "Your score is" ++ (Score.toText score)
+            --                 ]
+            --     Nothing ->
+            --         text "Errr, that's weird, there is no exam in progress so you shouldn't be in a game over state..."
 
 -- MAIN
 

@@ -79,16 +79,16 @@ failCurrentQuestion : Exam -> Exam
 failCurrentQuestion exam =
     next exam Fail
 
-submitAnswer : Exam -> String -> (Validity, Exam)
-submitAnswer (Exam exam) submission =
+submitAnswer : String -> Exam -> Exam
+submitAnswer submission (Exam exam) =
     let
         containsSubmission = String.contains submission
         validateSubmissionFor (Question translation) = List.Nonempty.any containsSubmission translation.frenchTranslation
     in
         if validateSubmissionFor exam.current then
-            (Pass, passCurrentQuestion (Exam exam))
+            passCurrentQuestion (Exam exam)
         else
-            (Fail, failCurrentQuestion (Exam exam))
+            failCurrentQuestion (Exam exam)
 
 score : Exam -> Score
 score (Exam exam) =
