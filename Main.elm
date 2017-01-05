@@ -134,7 +134,7 @@ viewExercise model =
             "Please translate \"" ++ aTranslation.englishWord ++ "\""
         question =
             model.exam
-                |> RemoteData.map (Exam.mapCurrentQuestion toText)
+                |> RemoteData.map (Exam.mapCurrentExercise toText)
                 |> RemoteData.withDefault "I could not prepare a new exercise."
     in
         div []

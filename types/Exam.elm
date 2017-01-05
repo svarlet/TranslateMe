@@ -2,11 +2,11 @@ module Types.Exam exposing
     ( Exam(..)
     , Validity(..)
     , init
-    , passCurrentQuestion
-    , failCurrentQuestion
+    , passCurrentExercise
+    , failCurrentExercise
     , score
     , fromTranslations
-    , mapCurrentQuestion
+    , mapCurrentExercise
     , submitAnswer)
 
 import List.Nonempty
@@ -15,43 +15,44 @@ import Types.Translation exposing (Translation, Translations)
 import Types.Score as Score exposing (Score)
 
 type Validity
-    = Pass
+    = NotAnswered
+    | Pass
     | Fail
 
-type Question =
-    Question Translation
-
-type Answer =
-    Answer Question Validity
+type Exercise =
+    Exercise Translation Validity
 
 type Exam =
     Exam
-      { answered : List Answer
-      , current : Question
-      , remaining : List Question
+      { previous : List Exercise
+      , current : Exercise
+      , remaining : List Exercise
       }
 
-
-init : Question -> List Question -> Exam
-init q qs =
+init : Exercise -> List Exercise -> Exam
+init e exs =
     Exam
-      { answered = []
-      , current = q
-      , remaining = qs
+      { previous = []
+      , current = e
+      , remaining = exs
       }
 
 fromTranslations : Translations -> Maybe Exam
 fromTranslations translations =
-    case translations of
-        [] ->
-            Nothing
-        x :: xs ->
-            Just <| init (Question x) <| List.map (Question) xs
-
-mapCurrentQuestion : (Translation -> a) -> Exam -> a
-mapCurrentQuestion f (Exam exam ) =
     let
-        (Question translation) = exam.current
+        toExerciseList =
+            List.map (\e -> Exercise e NotAnswered)
+    in
+        case translations of
+            [] ->
+                Nothing
+            x :: xs ->
+                Just <| init (Exercise x NotAnswered) <| toExerciseList xs
+
+mapCurrentExercise : (Translation -> a) -> Exam -> a
+mapCurrentExercise f (Exam exam) =
+    let
+        (Exercise translation _) = exam.current
     in
         f translation
 
@@ -64,39 +65,43 @@ next (Exam exam) validity =
                     (exam.current, [])
                 question :: rest ->
                     (question, rest)
+        (Exercise t _) = exam.current
     in
         Exam
-          { answered = exam.answered ++ [ Answer exam.current validity ]
+          { previous = exam.previous ++ [ Exercise t validity ]
           , current = q
           , remaining = qxs
           }
 
-passCurrentQuestion : Exam -> Exam
-passCurrentQuestion exam =
+passCurrentExercise : Exam -> Exam
+passCurrentExercise exam =
     next exam Pass
 
-failCurrentQuestion : Exam -> Exam
-failCurrentQuestion exam =
+failCurrentExercise : Exam -> Exam
+failCurrentExercise exam =
     next exam Fail
 
 submitAnswer : String -> Exam -> Exam
 submitAnswer submission (Exam exam) =
     let
-        containsSubmission = String.contains submission
-        validateSubmissionFor (Question translation) = List.Nonempty.any containsSubmission translation.frenchTranslation
+        containsSubmission =
+            String.contains submission
+        validateSubmissionFor (Exercise translation _) =
+            List.Nonempty.any containsSubmission translation.frenchTranslation
     in
         if validateSubmissionFor exam.current then
-            passCurrentQuestion (Exam exam)
+            passCurrentExercise (Exam exam)
         else
-            failCurrentQuestion (Exam exam)
+            failCurrentExercise (Exam exam)
 
 score : Exam -> Score
 score (Exam exam) =
     let
         updateScore answer score =
             case answer of
-                Answer _ Pass -> Score.succeed score
-                Answer _ Fail -> Score.fail score
+                Exercise _ Pass -> Score.succeed score
+                Exercise _ Fail -> Score.fail score
+                Exercise _ NotAnswered -> Score.fail score
     in
-        exam.answered
+        exam.previous
             |> List.foldl updateScore Score.init
