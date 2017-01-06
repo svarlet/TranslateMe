@@ -1,7 +1,7 @@
 module Main exposing (..)
 
-import Html exposing (Html, Attribute, div, input, text, button)
-import Html.Attributes exposing (value)
+import Html exposing (Html, Attribute, div, input, text, button, p)
+import Html.Attributes exposing (class, value)
 import Html.Events exposing (onInput, onClick)
 import Http exposing (Error(..))
 import List.Nonempty exposing (Nonempty(..))
@@ -177,35 +177,40 @@ viewPreviousResults model =
             >> List.intersperse ", "
             >> String.concat
         viewResult (Exercise t v) =
-            div []
+            p [ class "result bg-success" ]
                 [ text <| t.englishWord ++ ": " ++ (correctAnswersOf t) ]
         htmlResults =
             model.exam
                 |> RemoteData.map (Exam.currentResults >> List.map viewResult)
                 |> RemoteData.withDefault []
     in
-        div [] htmlResults
+        div [ ] htmlResults
 
 view : Model -> Html Msg
 view model =
-    case model.currentAppStage of
-        Bootstrap ->
-            div []
-                [ viewFlash model
-                , viewBootstrap
-                ]
-        Game ->
-            div []
-                [ viewFlash model
-                , viewExercise model
-                , viewScore model
-                , viewPreviousResults model
-                ]
-        GameOver ->
-            div []
-                [ text "Game Over!"
-                , viewScore model
-                ]
+    let
+        viewContent =
+            case model.currentAppStage of
+                Bootstrap ->
+                    div [ ]
+                        [ viewFlash model
+                        , viewBootstrap
+                        ]
+                Game ->
+                    div [ class "col-md-6 col-md-offset-3" ]
+                        [ viewFlash model
+                        , viewExercise model
+                        , viewScore model
+                        , viewPreviousResults model
+                        ]
+                GameOver ->
+                    div [ ]
+                        [ text "Game Over!"
+                        , viewScore model
+                        ]
+    in
+        div [ class "container" ]
+            [ viewContent ]
 
 -- MAIN
 
