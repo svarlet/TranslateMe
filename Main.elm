@@ -1,6 +1,6 @@
 module Main exposing (..)
 
-import Html exposing (Html, Attribute, div, input, text, button, p)
+import Html exposing (Html, Attribute, div, input, text, button, p, dl, dt, dd)
 import Html.Attributes exposing (class, value)
 import Html.Events exposing (onInput, onClick)
 import Http exposing (Error(..))
@@ -149,7 +149,11 @@ viewExercise model =
         div []
             [ text question
             , input [ onInput UserInput, value model.userInput ] [ ]
-            , button [ onClick Submit ] [ text "Submit"]
+            , button
+                  [ class "btn btn-primary"
+                  , onClick Submit
+                  ]
+                  [ text "Submit"]
             ]
 
 viewFlash : Model -> Html Msg
@@ -177,14 +181,17 @@ viewPreviousResults model =
             >> List.intersperse ", "
             >> String.concat
         viewResult (Exercise t v) =
-            p [ class "result bg-success" ]
-                [ text <| t.englishWord ++ ": " ++ (correctAnswersOf t) ]
+            [ dt []
+                  [ text t.englishWord ]
+            , dd []
+                  [ text <| correctAnswersOf t ]
+            ]
         htmlResults =
             model.exam
-                |> RemoteData.map (Exam.currentResults >> List.map viewResult)
+                |> RemoteData.map (Exam.currentResults >> List.map viewResult >> List.concat)
                 |> RemoteData.withDefault []
     in
-        div [ ] htmlResults
+        dl [ class "dl-horizontal" ] htmlResults
 
 view : Model -> Html Msg
 view model =
