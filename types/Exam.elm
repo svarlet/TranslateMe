@@ -8,6 +8,8 @@ module Types.Exam exposing
     , score
     , fromTranslations
     , submitAnswer
+    , currentResults
+    , isFinished
     )
 
 import List.Nonempty
@@ -78,3 +80,14 @@ score exam =
     in
         (Pivot.getL exam ++ [Pivot.getC exam] ++ Pivot.getR exam)
             |> List.foldl updateScore Score.init
+
+currentResults : Exam -> List Exercise
+currentResults exam =
+    if Pivot.hasR exam then
+        Pivot.getL exam
+    else
+       Pivot.getL exam ++ [Pivot.getC exam]
+
+isFinished : Exam -> Bool
+isFinished exam =
+    not <| Pivot.hasR exam

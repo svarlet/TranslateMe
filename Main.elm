@@ -114,12 +114,21 @@ update msg model =
                 , Cmd.none
                 )
         Submit ->
-            ( { model
-                  | exam = RemoteData.map (Exam.submitAnswer model.userInput) model.exam
-                  , userInput = ""
-              }
-            , Cmd.none
-            )
+            let
+                nextStage isFinished =
+                    if isFinished then GameOver else model.currentAppStage
+                nextAppStage =
+                    model.exam
+                        |> RemoteData.map (Exam.isFinished >> nextStage)
+                        |> RemoteData.withDefault model.currentAppStage
+            in
+                ( { model
+                      | exam = RemoteData.map (Exam.submitAnswer model.userInput) model.exam
+                      , userInput = ""
+                      , currentAppStage = nextAppStage
+                  }
+                , Cmd.none
+                )
 
 -- VIEW
 
@@ -159,6 +168,24 @@ viewScore model =
         div []
             [ text <| "Your score: " ++ score ]
 
+viewPreviousResults : Model -> Html Msg
+viewPreviousResults model =
+    let
+        correctAnswersOf =
+            .frenchTranslation
+            >> List.Nonempty.toList
+            >> List.intersperse ", "
+            >> String.concat
+        viewResult (Exercise t v) =
+            div []
+                [ text <| t.englishWord ++ ": " ++ (correctAnswersOf t) ]
+        htmlResults =
+            model.exam
+                |> RemoteData.map (Exam.currentResults >> List.map viewResult)
+                |> RemoteData.withDefault []
+    in
+        div [] htmlResults
+
 view : Model -> Html Msg
 view model =
     case model.currentAppStage of
@@ -172,6 +199,7 @@ view model =
                 [ viewFlash model
                 , viewExercise model
                 , viewScore model
+                , viewPreviousResults model
                 ]
         GameOver ->
             div []
