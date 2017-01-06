@@ -180,10 +180,15 @@ viewPreviousResults model =
             >> List.Nonempty.toList
             >> List.intersperse ", "
             >> String.concat
+        validityToCssClass v =
+            case v of
+                Pass -> class "text-success"
+                Fail -> class "text-danger"
+                NotAnswered -> class "text-info"
         viewResult (Exercise t v) =
             [ dt []
                   [ text t.englishWord ]
-            , dd []
+            , dd [ validityToCssClass v ]
                   [ text <| correctAnswersOf t ]
             ]
         htmlResults =
