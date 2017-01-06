@@ -1,8 +1,8 @@
 #!/bin/sh
 
-if [ ! -d "dist" ]
+if [ ! -d "./dist" ]
 then
-    mkdir /dist
+    mkdir ./dist
 fi
 
 elm make Main.elm --output dist/Main.js
