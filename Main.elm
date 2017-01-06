@@ -14,7 +14,7 @@ import RemoteData exposing (RemoteData(..), WebData)
 import Dict
 
 import Types.Translation exposing (Translation, Translations)
-import Types.Exam as Exam exposing (Exam(..), Validity(..))
+import Types.Exam as Exam exposing (Exam, Exercise(..), Validity(..))
 import Types.Score as Score
 
 -- MODEL
@@ -130,7 +130,7 @@ viewBootstrap =
 viewExercise : Model -> Html Msg
 viewExercise model =
     let
-        toText aTranslation =
+        toText (Exercise aTranslation _) =
             "Please translate \"" ++ aTranslation.englishWord ++ "\""
         question =
             model.exam

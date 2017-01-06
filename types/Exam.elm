@@ -1,15 +1,17 @@
 module Types.Exam exposing
-    ( Exam(..)
+    ( Exam
+    , Exercise(..)
     , Validity(..)
-    , init
+    , mapCurrentExercise
     , passCurrentExercise
     , failCurrentExercise
     , score
     , fromTranslations
-    , mapCurrentExercise
-    , submitAnswer)
+    , submitAnswer
+    )
 
 import List.Nonempty
+import Pivot exposing (Pivot)
 
 import Types.Translation exposing (Translation, Translations)
 import Types.Score as Score exposing (Score)
@@ -22,56 +24,28 @@ type Validity
 type Exercise =
     Exercise Translation Validity
 
-type Exam =
-    Exam
-      { previous : List Exercise
-      , current : Exercise
-      , remaining : List Exercise
-      }
-
-init : Exercise -> List Exercise -> Exam
-init e exs =
-    Exam
-      { previous = []
-      , current = e
-      , remaining = exs
-      }
+type alias Exam =
+    Pivot Exercise
 
 fromTranslations : Translations -> Maybe Exam
 fromTranslations translations =
-    let
-        toExerciseList =
-            List.map (\e -> Exercise e NotAnswered)
-    in
-        case translations of
-            [] ->
-                Nothing
-            x :: xs ->
-                Just <| init (Exercise x NotAnswered) <| toExerciseList xs
-
-mapCurrentExercise : (Translation -> a) -> Exam -> a
-mapCurrentExercise f (Exam exam) =
-    let
-        (Exercise translation _) = exam.current
-    in
-        f translation
+    translations
+        |> List.map (\t -> Exercise t NotAnswered)
+        |> Pivot.fromList
 
 next : Exam -> Validity -> Exam
-next (Exam exam) validity =
+next exam validity =
     let
-        (q, qxs) =
-            case exam.remaining of
-                [] ->
-                    (exam.current, [])
-                question :: rest ->
-                    (question, rest)
-        (Exercise t _) = exam.current
+        validateExercise validity (Exercise translation _) =
+            Exercise translation validity
     in
-        Exam
-          { previous = exam.previous ++ [ Exercise t validity ]
-          , current = q
-          , remaining = qxs
-          }
+        exam
+            |> Pivot.mapC (validateExercise validity)
+            |> Pivot.withRollback Pivot.goR
+
+mapCurrentExercise : (Exercise -> a) -> Exam -> a
+mapCurrentExercise f exam =
+    f <| Pivot.getC exam
 
 passCurrentExercise : Exam -> Exam
 passCurrentExercise exam =
@@ -82,26 +56,25 @@ failCurrentExercise exam =
     next exam Fail
 
 submitAnswer : String -> Exam -> Exam
-submitAnswer submission (Exam exam) =
+submitAnswer submission exam =
     let
         containsSubmission =
             String.contains submission
         validateSubmissionFor (Exercise translation _) =
             List.Nonempty.any containsSubmission translation.frenchTranslation
     in
-        if validateSubmissionFor exam.current then
-            passCurrentExercise (Exam exam)
+        if validateSubmissionFor <| Pivot.getC exam then
+            passCurrentExercise exam
         else
-            failCurrentExercise (Exam exam)
+            failCurrentExercise exam
 
 score : Exam -> Score
-score (Exam exam) =
+score exam =
     let
-        updateScore answer score =
-            case answer of
+        updateScore exercise score =
+            case exercise of
                 Exercise _ Pass -> Score.succeed score
-                Exercise _ Fail -> Score.fail score
-                Exercise _ NotAnswered -> Score.fail score
+                _ -> Score.fail score
     in
-        exam.previous
+        (Pivot.getL exam ++ [Pivot.getC exam] ++ Pivot.getR exam)
             |> List.foldl updateScore Score.init
