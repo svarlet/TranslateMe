@@ -57,6 +57,10 @@ failCurrentExercise : Exam -> Exam
 failCurrentExercise exam =
     next exam Fail
 
+skipCurrentExercise : Exam -> Exam
+skipCurrentExercise exam =
+    next exam NotAnswered
+
 submitAnswer : String -> Exam -> Exam
 submitAnswer submission exam =
     let

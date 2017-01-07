@@ -1,7 +1,7 @@
 module Main exposing (..)
 
-import Html exposing (Html, Attribute, div, input, text, button, p, dl, dt, dd)
-import Html.Attributes exposing (class, value)
+import Html exposing (Html, Attribute, div, input, text, button, p, dl, dt, dd, span)
+import Html.Attributes exposing (class, value, placeholder, type_)
 import Html.Events exposing (onInput, onClick)
 import Http exposing (Error(..))
 import List.Nonempty exposing (Nonempty(..))
@@ -25,12 +25,11 @@ type alias Model =
     { exam : WebData Exam
     , currentAppStage : AppStage
     , userInput : String
-    , flash : String
     }
 
 initialModel : Model
 initialModel =
-    Model NotAsked Bootstrap "" ""
+    Model NotAsked Bootstrap ""
 
 init : ( Model, Cmd Msg )
 init =
@@ -139,27 +138,35 @@ viewBootstrap =
 viewExercise : Model -> Html Msg
 viewExercise model =
     let
-        toText (Exercise aTranslation _) =
-            "Please translate \"" ++ aTranslation.englishWord ++ "\""
-        question =
+        extractEnglishWord (Exercise t _) =
+            t.englishWord
+        englishWord =
             model.exam
-                |> RemoteData.map (Exam.mapCurrentExercise toText)
-                |> RemoteData.withDefault "I could not prepare a new exercise."
+                |> RemoteData.map (Exam.mapCurrentExercise extractEnglishWord)
+                |> RemoteData.withDefault "ERROR: I could not prepare a new exercise."
     in
         div []
-            [ text question
-            , input [ onInput UserInput, value model.userInput ] [ ]
-            , button
-                  [ class "btn btn-primary"
-                  , onClick Submit
-                  ]
-                  [ text "Submit"]
+            [ p [ class "text-center" ]
+                  [ text "Try to translate" ]
+            , p [ class "lead text-center text-uppercase" ]
+                [ text englishWord ]
+            , div [ class "input-group" ]
+                [ input
+                      [ class "form-control"
+                      , value model.userInput
+                      , type_ "text"
+                      , placeholder "Your answer"
+                      ]
+                      []
+                , span
+                      [ class "input-group-btn" ]
+                      [ button
+                            [ class "btn btn-primary"
+                            , onClick Submit ]
+                            [ span [ class "glyphicon glyphicon-menu-right" ] [] ]
+                      ]
+                ]
             ]
-
-viewFlash : Model -> Html Msg
-viewFlash model =
-    div []
-        [ text model.flash ]
 
 viewScore : Model -> Html Msg
 viewScore model =
@@ -169,7 +176,7 @@ viewScore model =
                 |> RemoteData.map (Exam.score >> Score.toText)
                 |> RemoteData.withDefault "0/0"
     in
-        div []
+        p [ class "text-center" ]
             [ text <| "Your score: " ++ score ]
 
 viewPreviousResults : Model -> Html Msg
@@ -193,7 +200,7 @@ viewPreviousResults model =
             ]
         htmlResults =
             model.exam
-                |> RemoteData.map (Exam.currentResults >> List.map viewResult >> List.concat)
+                |> RemoteData.map (Exam.currentResults >> List.reverse >> List.map viewResult >> List.concat)
                 |> RemoteData.withDefault []
     in
         dl [ class "dl-horizontal" ] htmlResults
@@ -205,15 +212,14 @@ view model =
             case model.currentAppStage of
                 Bootstrap ->
                     div [ ]
-                        [ viewFlash model
-                        , viewBootstrap
-                        ]
+                        [ viewBootstrap ]
                 Game ->
                     div [ class "col-md-6 col-md-offset-3" ]
-                        [ viewFlash model
-                        , viewExercise model
-                        , viewScore model
-                        , viewPreviousResults model
+                        [ div [ class "jumbotron" ]
+                              [ viewExercise model
+                              , viewScore model
+                              , viewPreviousResults model
+                              ]
                         ]
                 GameOver ->
                     div [ ]
