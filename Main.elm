@@ -2,7 +2,7 @@ module Main exposing (..)
 
 import Html exposing (Html, Attribute, div, input, text, button, p, dl, dt, dd, span, em, img)
 import Html.Attributes exposing (class, value, placeholder, type_, src, style)
-import Html.Events exposing (onInput, onClick)
+import Html.Events exposing (onInput, onClick, on, keyCode)
 import Http exposing (Error(..))
 import List.Nonempty exposing (Nonempty(..))
 import Platform.Sub exposing (..)
@@ -12,6 +12,7 @@ import Regex exposing (..)
 import Result
 import RemoteData exposing (RemoteData(..), WebData)
 import Dict
+import Json.Decode
 
 import Types.Translation exposing (Translation, Translations)
 import Types.Exam as Exam exposing (Exam, Exercise(..), Validity(..))
@@ -138,6 +139,17 @@ viewBootstrap : Html Msg
 viewBootstrap =
     text "Bootstrapping..."
 
+onEnter : Msg -> Attribute Msg
+onEnter msg =
+    let
+        isEnter code =
+            if code == 13 then
+                Json.Decode.succeed msg
+            else
+                Json.Decode.fail "not ENTER"
+    in
+        on "keydown" (Json.Decode.andThen isEnter keyCode)
+
 viewExercise : Model -> Html Msg
 viewExercise model =
     let
@@ -158,6 +170,7 @@ viewExercise model =
                       , type_ "text"
                       , placeholder "Your answer"
                       , onInput UserInput
+                      , onEnter Submit
                       ]
                       []
                 , span
@@ -251,8 +264,8 @@ view model =
                 Game ->
                     div []
                         [ viewExercise model
-                        , viewProgress model
                         , viewScore model
+                        , viewProgress model
                         , viewPreviousResults model
                         ]
                 GameOver ->
