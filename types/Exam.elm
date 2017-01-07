@@ -10,6 +10,7 @@ module Types.Exam exposing
     , submitAnswer
     , currentResults
     , isFinished
+    , status
     )
 
 import List.Nonempty
@@ -20,6 +21,7 @@ import Types.Score as Score exposing (Score)
 
 type Validity
     = NotAnswered
+    | Skipped
     | Pass
     | Fail
 
@@ -45,10 +47,6 @@ next exam validity =
             |> Pivot.mapC (validateExercise validity)
             |> Pivot.withRollback Pivot.goR
 
-mapCurrentExercise : (Exercise -> a) -> Exam -> a
-mapCurrentExercise f exam =
-    f <| Pivot.getC exam
-
 passCurrentExercise : Exam -> Exam
 passCurrentExercise exam =
     next exam Pass
@@ -59,7 +57,11 @@ failCurrentExercise exam =
 
 skipCurrentExercise : Exam -> Exam
 skipCurrentExercise exam =
-    next exam NotAnswered
+    next exam Skipped
+
+mapCurrentExercise : (Exercise -> a) -> Exam -> a
+mapCurrentExercise f exam =
+    f <| Pivot.getC exam
 
 submitAnswer : String -> Exam -> Exam
 submitAnswer submission exam =
@@ -69,7 +71,9 @@ submitAnswer submission exam =
         validateSubmissionFor (Exercise translation _) =
             List.Nonempty.any containsSubmission translation.frenchTranslation
     in
-        if validateSubmissionFor <| Pivot.getC exam then
+        if String.trim submission == "" then
+            skipCurrentExercise exam
+        else if validateSubmissionFor <| Pivot.getC exam then
             passCurrentExercise exam
         else
             failCurrentExercise exam
@@ -95,3 +99,20 @@ currentResults exam =
 isFinished : Exam -> Bool
 isFinished exam =
     not <| Pivot.hasR exam
+
+status : Exam -> (Int, Int, Int, Int)
+status exam =
+    let
+        updateCounter exercise (passed, failed, skipped, notAnswered) =
+            case exercise of
+                Exercise _ Pass ->
+                    (passed + 1, failed, skipped, notAnswered)
+                Exercise _ Fail ->
+                    (passed, failed + 1, skipped, notAnswered)
+                Exercise _ Skipped ->
+                    (passed, failed, skipped + 1, notAnswered)
+                Exercise _ NotAnswered ->
+                    (passed, failed, skipped, notAnswered + 1)
+    in
+        (Pivot.getL exam ++ [Pivot.getC exam] ++ Pivot.getR exam)
+            |> List.foldl updateCounter (0, 0, 0, 0)

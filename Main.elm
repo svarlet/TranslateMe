@@ -1,7 +1,7 @@
 module Main exposing (..)
 
-import Html exposing (Html, Attribute, div, input, text, button, p, dl, dt, dd, span)
-import Html.Attributes exposing (class, value, placeholder, type_)
+import Html exposing (Html, Attribute, div, input, text, button, p, dl, dt, dd, span, em, img)
+import Html.Attributes exposing (class, value, placeholder, type_, src, style)
 import Html.Events exposing (onInput, onClick)
 import Http exposing (Error(..))
 import List.Nonempty exposing (Nonempty(..))
@@ -89,29 +89,32 @@ update msg model =
         LoadingComplete (Err error) ->
             ( { model | exam = Failure error }, Cmd.none )
         ShuffledTranslation shuffledTranslations ->
-            case Exam.fromTranslations shuffledTranslations of
-                Just exam ->
-                    ( { model
-                          | exam = Success exam
-                          , currentAppStage = Game
-                      }
-                    , Cmd.none
-                    )
-                Nothing ->
-                    let
-                        status = { code = 200, message = "Ok" }
-                        headers = Dict.empty
-                        body = "<CSV file content>"
-                        errorMessage = "Could not prepare an exam from the reference file."
-                        failure =
-                            Http.Response translationsUrl status headers body
-                                |> BadPayload errorMessage
-                    in
-                        ( { model | exam = Failure failure }, Cmd.none )
+            let
+                twentyTranslations = List.take 20 shuffledTranslations
+            in
+                case Exam.fromTranslations twentyTranslations of
+                    Just exam ->
+                        ( { model
+                              | exam = Success exam
+                              , currentAppStage = Game
+                          }
+                        , Cmd.none
+                        )
+                    Nothing ->
+                        let
+                            status = { code = 200, message = "Ok" }
+                            headers = Dict.empty
+                            body = "<CSV file content>"
+                            errorMessage = "Could not prepare an exam from the reference file."
+                            failure =
+                                Http.Response translationsUrl status headers body
+                                    |> BadPayload errorMessage
+                        in
+                            ( { model | exam = Failure failure }, Cmd.none )
         UserInput input ->
-                ( { model | userInput = input }
-                , Cmd.none
-                )
+            ( { model | userInput = input }
+            , Cmd.none
+            )
         Submit ->
             let
                 nextStage isFinished =
@@ -146,9 +149,7 @@ viewExercise model =
                 |> RemoteData.withDefault "ERROR: I could not prepare a new exercise."
     in
         div []
-            [ p [ class "text-center" ]
-                  [ text "Try to translate" ]
-            , p [ class "lead text-center text-uppercase" ]
+            [ p [ class "lead text-center text-uppercase" ]
                 [ text englishWord ]
             , div [ class "input-group" ]
                 [ input
@@ -156,6 +157,7 @@ viewExercise model =
                       , value model.userInput
                       , type_ "text"
                       , placeholder "Your answer"
+                      , onInput UserInput
                       ]
                       []
                 , span
@@ -191,12 +193,14 @@ viewPreviousResults model =
             case v of
                 Pass -> class "text-success"
                 Fail -> class "text-danger"
-                NotAnswered -> class "text-info"
+                _ -> class "text-warning"
         viewResult (Exercise t v) =
             [ dt []
                   [ text t.englishWord ]
             , dd [ validityToCssClass v ]
-                  [ text <| correctAnswersOf t ]
+                [ em []
+                      [ text <| correctAnswersOf t ]
+                ]
             ]
         htmlResults =
             model.exam
@@ -204,6 +208,37 @@ viewPreviousResults model =
                 |> RemoteData.withDefault []
     in
         dl [ class "dl-horizontal" ] htmlResults
+
+viewProgress : Model -> Html Msg
+viewProgress model =
+    let
+        (passed, failed, skipped, notAnswered) =
+            model.exam
+                |> RemoteData.map Exam.status
+                |> RemoteData.withDefault (0,0,0,0)
+        _ = Debug.log (toString (passed, failed, skipped, notAnswered)) "lol"
+        exerciseCount = passed + failed + skipped + notAnswered
+        toPercentage a b =
+            (toFloat a) / (toFloat b)
+                |> (*) 100
+                |> ceiling
+                |> toString
+                |> (flip String.append) "%"
+    in
+        div [ class "progress" ]
+            [ div [ class "progress-bar progress-bar-success"
+                  , style [ ("width", toPercentage passed exerciseCount) ]
+                  ]
+                  []
+            , div [ class "progress-bar progress-bar-warning"
+                  , style [ ("width", toPercentage skipped exerciseCount) ]
+                  ]
+                  []
+            , div [ class "progress-bar progress-bar-danger"
+                  , style [ ("width", toPercentage failed exerciseCount) ]
+                  ]
+                  []
+            ]
 
 view : Model -> Html Msg
 view model =
@@ -214,21 +249,27 @@ view model =
                     div [ ]
                         [ viewBootstrap ]
                 Game ->
-                    div [ class "col-md-6 col-md-offset-3" ]
-                        [ div [ class "jumbotron" ]
-                              [ viewExercise model
-                              , viewScore model
-                              , viewPreviousResults model
-                              ]
+                    div []
+                        [ viewExercise model
+                        , viewProgress model
+                        , viewScore model
+                        , viewPreviousResults model
                         ]
                 GameOver ->
                     div [ ]
-                        [ text "Game Over!"
+                        [ p [ class "well lead text-center text-uppercase" ] [ text "Game Over!" ]
                         , viewScore model
+                        , viewPreviousResults model
                         ]
     in
         div [ class "container" ]
-            [ viewContent ]
+            [ div [ class "col-sm-6 col-sm-offset-3"]
+                  [ div [ class "jumbotron" ]
+                        [ img [ class "img-responsive", src "logo.png" ] []
+                        , viewContent
+                        ]
+                  ]
+            ]
 
 -- MAIN
 
