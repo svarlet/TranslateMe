@@ -91,12 +91,22 @@ score exam =
         (Pivot.getL exam ++ [Pivot.getC exam] ++ Pivot.getR exam)
             |> List.foldl updateScore Score.init
 
+isNotAnswered : Exercise -> Bool
+isNotAnswered e =
+    case e of
+        Exercise _ NotAnswered ->
+            True
+        _ ->
+            False
+
 currentResults : Exam -> List Exercise
 currentResults exam =
     if Pivot.hasR exam then
         Pivot.getL exam
+    else if isNotAnswered <| Pivot.getC exam then
+        Pivot.getL exam
     else
-       Pivot.getL exam ++ [Pivot.getC exam]
+        Pivot.getL exam ++ [Pivot.getC exam]
 
 isFinished : Exam -> Bool
 isFinished exam =
