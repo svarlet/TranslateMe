@@ -66,8 +66,10 @@ mapCurrentExercise f exam =
 submitAnswer : String -> Exam -> Exam
 submitAnswer submission exam =
     let
+        lowerCaseSubmission =
+            String.toLower submission
         containsSubmission =
-            String.contains submission
+            String.contains lowerCaseSubmission
         validateSubmissionFor (Exercise translation _) =
             List.Nonempty.any containsSubmission translation.frenchTranslation
     in
