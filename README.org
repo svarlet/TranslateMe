@@ -11,3 +11,7 @@ The game can be played [[http://s3.amazonaws.com/translateme/index.html][here]].
 - Click on the link mentioned above;
 - Answer the 20 random translations;
 - Repeat.
+
+* Preview
+
+![preview](https://github.com/svarlet/TranslateMe/raw/master/preview/translateme-preview.png)

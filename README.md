@@ -4,6 +4,7 @@
 <ul>
 <li><a href="#sec-1">1. Practice your English `vocabulaire`!</a></li>
 <li><a href="#sec-2">2. How to play the game?</a></li>
+<li><a href="#sec-3">3. Preview</a></li>
 </ul>
 </div>
 </div>
@@ -22,3 +23,7 @@ The game can be played [here](http://s3.amazonaws.com/translateme/index.html).
 -   Click on the link mentioned above;
 -   Answer the 20 random translations;
 -   Repeat.
+
+# Preview<a id="sec-3" name="sec-3"></a>
+
+\\![preview](![img](//github.com/svarlet/TranslateMe/raw/master/preview/translateme-preview.png))
