@@ -14,4 +14,4 @@ The game can be played [[http://s3.amazonaws.com/translateme/index.html][here]].
 
 * Preview
 
-![preview](https://github.com/svarlet/TranslateMe/raw/master/preview/translateme-preview.png)
+![preview](/preview/translateme-preview.png)
