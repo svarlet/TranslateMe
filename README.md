@@ -26,4 +26,4 @@ The game can be played [here](http://s3.amazonaws.com/translateme/index.html).
 
 # Preview<a id="sec-3" name="sec-3"></a>
 
-\\![preview](![img](//github.com/svarlet/TranslateMe/raw/master/preview/translateme-preview.png))
+![preview](preview/translateme-preview.png)
