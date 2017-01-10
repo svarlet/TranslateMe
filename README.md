@@ -19,7 +19,7 @@ The game can be played [here](http://s3.amazonaws.com/translateme/index.html).
 
 # How to play the game?<a id="sec-2" name="sec-2"></a>
 
--   **Mandatory step:** Learn French :frowning: :wine:
+-   **Mandatory step:** Learn French :frowning: :wine_glass:
 -   Click on the link mentioned above;
 -   Answer the 20 random translations;
 -   Repeat.
