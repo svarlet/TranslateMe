@@ -57,7 +57,14 @@ examTests =
                 Expect.equal Nothing <| Exam.fromTranslations []
         , fuzz (list translationFuzzer) "fromTranslations returns an Exam with no previous exercise" <|
             \translations ->
-                Expect.equal [] (Exam.fromTranslations translations |> Maybe.map (Pivot.getL) |> Maybe.withDefault [])
+                let
+                    pastExercises =
+                        translations
+                            |> Exam.fromTranslations
+                            |> Maybe.map Pivot.getL
+                            |> Maybe.withDefault []
+                in
+                    Expect.equal [] pastExercises
         ]
 
 
