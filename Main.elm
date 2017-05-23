@@ -48,7 +48,7 @@ type Msg
 
 translationsUrl : String
 translationsUrl =
-    "https://dl.dropboxusercontent.com/u/4800046/word-list.csv"
+    "https://www.dropbox.com/s/0hjew55alvj61l8/word-list.csv?dl=0"
 
 loadTranslations : Cmd Msg
 loadTranslations =
